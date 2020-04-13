@@ -262,6 +262,7 @@ for segs in segments:
 #### Behavior
 
 After plotting the chart, I found 11 distinct patterns for each segment. 
+[Click here to check the trends](https://github.com/surya-de/on_semi_ds/blob/master/trends.pdf
 
 ##  3. Churn
 To calculate probable churn I have taken an approach of identifying the sales trend over years for each customer. To understand the trend I have used the following **KPIs:**
