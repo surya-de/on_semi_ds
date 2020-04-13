@@ -180,6 +180,86 @@ for i in range(0, len(cust_target_tagged_df)):
 
 cust_target_tagged_df
 ```
+##  2. Customer segmentation
+***Customers can be segmented in multiple ways-***
+1. **Based on customer's personal information**-
+If we have data that explain the customer's interest and other information, we can use it to segment the customer. This way it will help us in knowing the customer better and reach out to them in a more personalized way. Such data can be gained by asking customers to take part in surveys.
+For our use case we don't have this data available.
+2. **Based on customer's product information**- We can try to segment the customer based on the kind of products the customer is interested in. This way we can reach out to customers by knowing what they already want. This data is available in this use case but this might not be a very efficient way to segment the customers for this use case. In this case, we might want to narrow down our focus to customers with higher value in terms of revenue.
+3. **Based on revenue generated from customer**- According to me this would be a better approach for this use case where we are dealing with supplier and customer relationship. Reasons are as follows-
+- We(from supplier's point of view) will have a better visibility for the customers who are contributing most in the revenue generation.
+- We can focus on the customer-supplier relationships on each segments and can decide the amount of effort the marketing team needs to put for improvement in relationship.
+- It will be easier to quantify efforts the marketing team needs to put for relationship improvement as it can be directly linked to a dollar value.
 
+***Behavior of the current segmentation***
+
+In this case the customers have been segmented based on the **sales value**.
+
+#### Algorithm
+1. Extracted all the unique customer segments available in the data.
+2. I calculated the total sales amount.
+```python
+total_sales_amount = quantity * sales
+```
+3. Grouped the dataset baed on customer id and year. This will give me annual sales amount for each customer.
+```
+seg_agg_df = seg_df.groupby(['Year', 'CustomerID']).total_amt.sum().to_frame('Total_Sale').reset_index()
+```
+4. Finally, I plot the total sales amount for each year.
+
+#### Code
+```Python
+'''
+Module to identify behaviour of segments.
+Steps-
+1. Identify the KPI's based on which the segments have
+    been created.
+'''
+
+# Unique segments present in the data
+segments = set()
+for elems in trans_df['Customer Segment']:
+    segments.add(elems)
+segments = list(segments)
+
+# Check total sales trend for each segments
+for segs in segments:
+    seg_df = pd.DataFrame(index = trans_df.index, columns = trans_columns)
+    seg_df = seg_df.sort_values('Year')
+    seg_df['total_amt'] = 0
+    
+    for i in range(1, len(trans_df)):
+        if trans_df['Customer Segment'][i] == segs:
+            seg_df.loc[i] = trans_df.loc[i]
+    
+    seg_df.dropna(subset = ['Customer Segment'], inplace = True)
+    seg_df.reset_index(drop = True, inplace = True)
+
+    for i in range(1, len(seg_df)):
+        # Create total amount column by multiplying per unit cost.
+        # with toatl orders.
+        seg_df['total_amt'][i] = int(seg_df['Orders'][i]) * float(seg_df['Sales'][i])
+    # Create new aggegate dataframe with pertinent columns.
+    seg_agg_df = seg_df.groupby(['Year', 'CustomerID']).total_amt.sum().to_frame('Total_Sale').reset_index()
+    
+    print('--------------------------------------------')
+    print('Plotting for segment-')
+    print(segs)
+    print('--------------------------------------------')
+    # Plot to understand the trend
+    for customers in seg_agg_df['CustomerID']:
+        financial_year = []
+        total_sale = []
+        
+        for i in range(0, len(seg_agg_df)):
+            if seg_agg_df['CustomerID'][i] == customers:
+                financial_year.append(seg_agg_df['Year'][i])
+                total_sale.append(seg_agg_df['Total_Sale'][i])
+        plot(financial_year, total_sale)
+        show()
+```
+
+#### Behavior
+After plotting the chart, I found 11 distinct patterns for each segment. 
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)
