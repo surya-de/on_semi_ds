@@ -358,9 +358,6 @@ Initially, I wanted to use this approach but unfortunately I could not manage th
 ```Python
 '''
 Module to identify churn.
-Steps-
-1. Identify the KPI's based on which the segments have
-    been created.
 '''
 churn_df = trans_df.copy()
 churn_df = churn_df.sort_values('Year')
