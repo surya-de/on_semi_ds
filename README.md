@@ -260,6 +260,165 @@ for segs in segments:
 ```
 
 #### Behavior
+
 After plotting the chart, I found 11 distinct patterns for each segment. 
-## License
-[MIT](https://choosealicense.com/licenses/mit/)
+
+##  3. Churn
+To calculate probable churn I have taken an approach of identifying the sales trend over years for each customer. To understand the trend I have used the following **KPIs:**
+
+- **Percentage increase/decrease in total sales each year**
+
+  This KPI denotes how the total sales value for each customer has increased or decreased over the years.
+```
+percentage_change_in_sales = ((current_yr_sales - previous_yr_sale) / previous_yr_sale) * 100
+```
+- **Median of the change in values over the years (med_val)**
+
+  This KPI helps us understand how the normal trend for the customer have been over the years. A negative median value denotes a customer has a negative trend in sales amount for most of the times and vice versa.
+- **Percentage change in the current year (curr_val)**
+
+  This KPI helps us identify the customer's  sales trend for the current year.
+
+** In all the cases, a negative value denotes a decrease in the sales value from the previous year and a positive value denotes an increase in sales value.
+
+#### Tag Matrix based on KPI values
+Based on the KPIs calculated in the previous steps I have formulated a tag matrix which will help us tag the customers based on  probability for churn.
+
+**Tags-** There are 4 tags-
+
+- **High**- The customers coming under this tag has a higher chance of switching to a different supplier.
+
+```
+1. If the median value is +ve and the current year sales value is negative, we tag 
+the customer under this category.
+2. A positive median signifies, the customer had a good account consistently in the 
+past years.
+3. A negative current year sales value signifies the sales amount for the current 
+year has decreased.
+4. This sudden dip in sales might signify a churn and since the median is positive, we
+must be highly concerned because we might be losing a customer who had a good track 
+record.
+```
+- **Medium**- Customers under this tag has a fair chance of switching.
+```
+1. If the median value is +ve, the current year sales value is also +ve 
+but the current year value is less than the median value we tag the customer under 
+this category.
+2. A positive median signifies, the customer had a good account consistently in the 
+past years.
+3. A positive current year sales value signifies the sales amount for the current 
+year has increased.
+4. The current year sales value is less than the median value means even the sales have 
+increased, its not as mush as how it normally happens.
+5. Even though both the values are increasing, this might be something to worry about
+because this decrease in increment from the median value might be an early stage and
+the value might further decrease in the coming years.
+```
+
+- **keep track**- Customers under this tag are in the borderline. They might turn out to improve or churn.
+```
+1. If the median value is -ve and the current year sales value is +ve. 
+2. A negative median signifies, the customer had a poor account consistently in the 
+past years.
+3. A positive current year sales value signifies the sales amount for the current 
+year has increased.
+5. In this case the +ve current year sales may be a good thing as the customer 
+has a negative median. This case can turn out either way and hence can keep a track
+of these cases.
+```
+
+- **safe**- These are the customers who have an ideal trend and ideal median. They are least likely to switch suppliers.
+
+#### Another Approach
+
+While analyzing the data I realized another way to achieve churn could be using classification algorithms.
+
+- If we group the data based on year, customer id and SKU NO we will find in many cases the supplier has changed for the same item.
+
+  eg- 
+  
+| Year | Customer_id | SKU_NO | Supplier | Sales Value |
+|------|-------------|--------|----------|-------------|
+| 2013 | 289306      | A123   | S1       | $1245       |
+| 2014 | 289306      | A123   | S1       | $234        |
+| 2015 | 289306      | A123   | S1       | $50         |
+| 2016 | 289306      | A123   | S2       | $1000       |
+| 2017 | 289306      | A123   | S2       | $1247       |
+
+  
+  If, customer- A have been procuring item -a123 from supplier S1 till 2015 and from 2016 the customer starts procuring the same item from supplier S2, this signifies a churn for supplier S1.
+
+- This historical data could have been tagged and passed to a classification model after performing feature engineering.
+
+- The mode could be used to predict future churns.
+
+Initially, I wanted to use this approach but unfortunately I could not manage the compute of my system for the entire data. Hence, I figured out another statistical approach to solve this problem.
+
+#### code
+```
+'''
+Module to identify churn.
+Steps-
+1. Identify the KPI's based on which the segments have
+    been created.
+'''
+churn_df = trans_df.copy()
+churn_df = churn_df.sort_values('Year')
+churn_df['total_amt'] = 0
+
+for i in range(1, len(churn_df)):
+    # Convert month value to integer.
+    churn_df['Month'][i] = int(churn_df['Month'][i])
+    # Create total amount column by multiplying per unit cost.
+    # with toatl orders.
+    churn_df['total_amt'][i] = int(churn_df['Orders'][i]) * float(churn_df['Sales'][i])
+
+# Create new aggegate dataframe with pertinent columns.
+churn_agg_df = churn_df.groupby(['Year', 'CustomerID', 'Supplier', 'SKU No']).total_amt.sum().to_frame('Total_Sale').reset_index()
+
+# add composite key- concat(CustomerID, Supplier)
+churn_agg_df['c_key'] = 'N/A'
+for i in range(0, len(churn_agg_df)):
+    churn_agg_df['c_key'][i] = churn_agg_df['CustomerID'][i] + churn_agg_df['Supplier'][i]
+    
+# creating the tagged dataframe
+churn_tagged_df = pd.DataFrame(index=churn_agg_df.index, columns = ['customer_id', 'c_key', 'median', 'curr_year_percentage', 'tag'])
+churn_tagged_df['tag'] = 'No Value'
+idx = 0
+for customers in churn_agg_df['CustomerID']:
+    curr_year = 0
+    percentage = []
+    init_store = []
+    for i in range(0, len(churn_agg_df)):
+        if churn_agg_df['CustomerID'][i] == customers:
+            init_store.append(churn_agg_df['Total_Sale'][i])
+            churn_tagged_df['c_key'][i] = churn_agg_df['c_key'][i]
+    
+    # Calculate percentage increase or decrease.
+    for i in range(1, len(init_store)):
+        temp = ((init_store[i] - init_store[i - 1]) / init_store[i - 1]) * 100
+        percentage.append(temp)
+    
+    ln = len(percentage) - 1
+    if ln >= 0:
+        curr_year = percentage[ln]
+    # Drop the na values and reset index
+    churn_tagged_df.dropna(subset=['c_key'], inplace = True)
+    churn_tagged_df.reset_index(drop = True, inplace = True)
+    # Calculate the kpi metrices.
+    churn_tagged_df['customer_id'][idx] = customers
+    churn_tagged_df['median'][idx] = median(percentage)
+    churn_tagged_df['curr_year_percentage'][idx] = curr_year
+    idx += 1
+print(churn_tagged_df)
+# Tag the customer ids based on anlysis
+for i in range(0, len(churn_tagged_df)):
+    if churn_tagged_df['median'][i] > 0 and churn_tagged_df['curr_year_percentage'][i] < 0:
+        churn_tagged_df['tag'][i] = 'high focus'
+    elif churn_tagged_df['median'][i] > 0 and churn_tagged_df['curr_year_percentage'][i] > 0 and churn_tagged_df['curr_year_percentage'][i] < churn_tagged_df['median'][i]:
+        churn_tagged_df['tag'][i] = 'medium focus'
+    elif churn_tagged_df['median'][i] < 0 and churn_tagged_df['curr_year_percentage'][i] > 0 and churn_tagged_df['curr_year_percentage'][i] > churn_tagged_df['median'][i]:
+        churn_tagged_df['tag'][i] = 'keep track'
+    else:
+        churn_tagged_df['tag'][i] = 'safe'
+```
