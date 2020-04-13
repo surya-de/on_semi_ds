@@ -355,7 +355,7 @@ While analyzing the data I realized another way to achieve churn could be using 
 Initially, I wanted to use this approach but unfortunately I could not manage the compute of my system for the entire data. Hence, I figured out another statistical approach to solve this problem.
 
 #### code
-```
+```Python
 '''
 Module to identify churn.
 Steps-
